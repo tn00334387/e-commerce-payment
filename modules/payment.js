@@ -17,9 +17,19 @@ const PaymentModule = {
 
     ProcessPayment: async ( req, res ) => {
 
-        const { orderId, userId, amount, paymentMethod } = req.body;
+        const userId = req.headers['x-user-id'];
+        const { orderId, amount, paymentMethod } = req.body;
 
         try {
+
+            if( !userId ){
+                console.log(`User is not login`)
+                res.status(401).json({ 
+                    status: 'Unauthorized',
+                    message: 'User is not login' 
+                })
+                return 
+            }
 
             const payment = new Payment({
                 orderId,
@@ -59,10 +69,20 @@ const PaymentModule = {
 
     ProcessPaymentQ: async ( req, res ) => {
 
-        const { orderId, userId, amount, paymentMethod } = req.body;
+        const userId = req.headers['x-user-id'];
+        const { orderId, amount, paymentMethod } = req.body;
 
         try {
 
+            if( !userId ){
+                console.log(`User is not login`)
+                res.status(401).json({ 
+                    status: 'Unauthorized',
+                    message: 'User is not login' 
+                })
+                return 
+            }
+            
             const payment = new Payment({
                 orderId,
                 userId,
@@ -83,6 +103,63 @@ const PaymentModule = {
 
                 const message = JSON.stringify({ orderId, status: 'Paid' });
                 await KafkaService.sendMessage('ec-payment', message);
+
+                res.json({ 
+                    message: 'Payment successful', 
+                    payment 
+                });
+            } else {
+                res.status(422).json({ 
+                    message: 'Payment failed', 
+                    payment 
+                });
+            }
+
+        } catch (error) {
+            console.log(`Payment - ProcessPayment : `, error)
+            res.status(500).json({ 
+                status: `Failed`,
+                message: 'ProcessPayment failed' 
+            });
+        }
+    },
+
+    ProcessPaymentQR: async ( req, res ) => {
+
+        const userId = req.headers['x-user-id'];
+        const { orderId, amount, paymentMethod } = req.body;
+
+        try {
+
+            if( !userId ){
+                console.log(`User is not login`)
+                res.status(401).json({ 
+                    status: 'Unauthorized',
+                    message: 'User is not login' 
+                })
+                return 
+            }
+            
+            const payment = new Payment({
+                orderId,
+                userId,
+                amount,
+                paymentMethod,
+                status: 'Pending',
+            });
+    
+            await payment.save();
+
+
+            const isPaymentSuccessful = await pay(userId)
+            payment.status = isPaymentSuccessful ? 'Completed' : 'Failed'
+            await payment.save();
+    
+            console.log(`user-${userId} process payment ${isPaymentSuccessful}`)
+            if (isPaymentSuccessful) {
+
+                const message = JSON.stringify({ userId, orderId, status: 'Paid' });
+                await KafkaService.sendMessage('ec-payment-r', message);
 
                 res.json({ 
                     message: 'Payment successful', 
