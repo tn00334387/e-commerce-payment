@@ -1,7 +1,7 @@
 const Payment = require('../models/payment');
 const Kafka = require('../libs/kafka')
 const axios = require('axios');
-const KafkaService = new Kafka(process.env.KAFKA_HOST_URI);
+const KafkaService = new Kafka();
 
 async function initProducer() {
   try {
